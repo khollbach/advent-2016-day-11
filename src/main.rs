@@ -1,13 +1,13 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeSet, BinaryHeap, HashMap},
+    collections::{BinaryHeap, HashMap},
 };
 
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
-    // let ans = a_star(State::start(), State::target()).context("no path found")?;
-    // println!("{}", ans);
+    let ans = a_star(State::start(), State::target()).context("no path found")?;
+    println!("{}", ans);
 
     let ans = a_star(State::start_part2(), State::target_part2()).context("no path found")?;
     println!("{}", ans);
@@ -15,35 +15,25 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// (Shouldn't really be Ord, but we're using it in a BinaryHeap.)
+const NUM_FLOORS: usize = 4;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct State {
-    elevator: usize,
-    floors: [BTreeSet<Object>; 4],
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-struct Object {
-    element: String,
-    type_: ObjectType,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-enum ObjectType {
-    Microchip,
-    Generator,
+    elevator: u8,
+    microchips: [u8; NUM_FLOORS],
+    generators: [u8; NUM_FLOORS],
 }
 
 /// Find the shortest path from source to target.
-fn a_star(source: State, target: State) -> Option<usize> {
+fn a_star(source: State, target: State) -> Option<u32> {
     let mut seen = HashMap::new();
     let mut to_visit = BinaryHeap::new(); // min-heap
 
     let t = source.target_estimate();
     seen.insert(source.clone(), t);
-    to_visit.push((Reverse(0 + t), 0, t, source));
+    to_visit.push((Reverse(0 + t), 0, source));
 
-    while let Some((Reverse(cost), source_est, _, curr)) = to_visit.pop() {
+    while let Some((Reverse(cost), source_est, curr)) = to_visit.pop() {
         if seen[&curr] < cost {
             continue;
         }
@@ -59,7 +49,7 @@ fn a_star(source: State, target: State) -> Option<usize> {
             let c = s + t;
             if !seen.contains_key(&next) || c < seen[&next] {
                 seen.insert(next.clone(), c);
-                to_visit.push((Reverse(c), s, t, next));
+                to_visit.push((Reverse(c), s, next));
             }
         }
     }
@@ -69,11 +59,11 @@ fn a_star(source: State, target: State) -> Option<usize> {
 
 impl State {
     /// This must be a lower bound on the distance to the target.
-    fn target_estimate(&self) -> usize {
+    fn target_estimate(&self) -> u32 {
         let mut total_cost = 0;
         let mut num_objects = 0;
-        for f in &self.floors {
-            num_objects += f.len();
+        for i in 0..NUM_FLOORS {
+            num_objects += self.microchips[i].count_ones() + self.generators[i].count_ones();
             total_cost += if num_objects >= 2 {
                 num_objects * 2 - 3
             } else {
@@ -97,26 +87,37 @@ impl State {
         let mut out = vec![];
 
         for dirn in [-1, 1] {
-            let old_floor = self.elevator;
+            let old_floor = usize::from(self.elevator);
             let new_floor = isize::try_from(old_floor).unwrap() + dirn;
 
-            let in_bounds =
-                0 <= new_floor && new_floor < isize::try_from(self.floors.len()).unwrap();
+            let in_bounds = 0 <= new_floor && new_floor < isize::try_from(NUM_FLOORS).unwrap();
             if !in_bounds {
                 continue;
             }
             let new_floor = usize::try_from(new_floor).unwrap();
 
             // Note that x and y can be the same.
-            for x in &self.floors[old_floor] {
-                for y in &self.floors[old_floor] {
-                    let mut new_state = self.clone();
-                    new_state.elevator = new_floor;
-                    new_state.floors[old_floor].remove(x);
-                    new_state.floors[old_floor].remove(y);
-                    new_state.floors[new_floor].insert(x.clone());
-                    new_state.floors[new_floor].insert(y.clone());
-                    out.push(new_state);
+            // x = (i, a)
+            for i in 0..2 {
+                for a in 0..8 {
+                    // y = (j, b)
+                    for j in 0..2 {
+                        for b in a..8 {
+                            let x_le_y = (i, a) <= (j, b);
+                            let x_exists = self.obj(i)[old_floor] & 1 << a != 0;
+                            let y_exists = self.obj(j)[old_floor] & 1 << b != 0;
+
+                            if x_le_y && x_exists && y_exists {
+                                let mut new_state = self.clone();
+                                new_state.elevator = u8::try_from(new_floor).unwrap();
+                                new_state.obj_mut(i)[old_floor] &= !(1 << a);
+                                new_state.obj_mut(j)[old_floor] &= !(1 << b);
+                                new_state.obj_mut(i)[new_floor] |= 1 << a;
+                                new_state.obj_mut(j)[new_floor] |= 1 << b;
+                                out.push(new_state);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -124,18 +125,27 @@ impl State {
         out
     }
 
+    fn obj(&self, i: usize) -> &[u8; 4] {
+        match i {
+            0 => &self.microchips,
+            1 => &self.generators,
+            _ => panic!(),
+        }
+    }
+
+    fn obj_mut(&mut self, i: usize) -> &mut [u8; 4] {
+        match i {
+            0 => &mut self.microchips,
+            1 => &mut self.generators,
+            _ => panic!(),
+        }
+    }
+
     fn is_valid(&self) -> bool {
-        assert!(self.elevator < self.floors.len());
-        self.floors.iter().all(|floor| {
-            floor.iter().all(|x| {
-                let generator = x.type_ == ObjectType::Generator;
-                let protected = floor
-                    .iter()
-                    .any(|y| x.element == y.element && y.type_ == ObjectType::Generator);
-                let fried = floor.iter().any(|y| y.type_ == ObjectType::Generator);
-                let safe = generator || protected || !fried;
-                safe
-            })
+        debug_assert!(self.elevator < u8::try_from(NUM_FLOORS).unwrap());
+        (0..NUM_FLOORS).all(|i| {
+            let exposed_microchips = self.microchips[i] & !self.generators[i];
+            exposed_microchips == 0 || self.generators[i] == 0
         })
     }
 }
@@ -145,147 +155,32 @@ impl State {
     fn start() -> Self {
         Self {
             elevator: 0,
-            floors: [
-                vec![
-                    Object {
-                        element: "promethium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "promethium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                ],
-                vec![
-                    Object {
-                        element: "cobalt".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "curium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "ruthenium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "plutonium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                ],
-                vec![
-                    Object {
-                        element: "cobalt".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "curium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "ruthenium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "plutonium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                ],
-                vec![],
-            ]
-            .map(|vec| vec.into_iter().collect()),
+            microchips: [0b1, 0, 0b_1111_0, 0],
+            generators: [0b1, 0b_1111_0, 0, 0],
         }
     }
 
     fn target() -> Self {
         Self {
             elevator: 3,
-            floors: [
-                vec![],
-                vec![],
-                vec![],
-                vec![
-                    Object {
-                        element: "promethium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "promethium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "cobalt".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "curium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "ruthenium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "plutonium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "cobalt".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "curium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "ruthenium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "plutonium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                ],
-            ]
-            .map(|vec| vec.into_iter().collect()),
+            microchips: [0, 0, 0, 0b_1_1111],
+            generators: [0, 0, 0, 0b_1_1111],
         }
     }
 
     fn start_part2() -> Self {
-        let mut state = Self::start();
-        for obj in part2_objects() {
-            state.floors[0].insert(obj);
+        Self {
+            elevator: 0,
+            microchips: [0b_11_0000_1, 0, 0b_1111_0, 0],
+            generators: [0b_11_0000_1, 0b_1111_0, 0, 0],
         }
-        state
     }
 
     fn target_part2() -> Self {
-        let mut state = Self::target();
-        for obj in part2_objects() {
-            state.floors[3].insert(obj);
+        Self {
+            elevator: 3,
+            microchips: [0, 0, 0, 0b_11_1111_1],
+            generators: [0, 0, 0, 0b_11_1111_1],
         }
-        state
     }
-}
-
-fn part2_objects() -> Vec<Object> {
-    vec![
-        Object {
-            element: "elerium".into(),
-            type_: ObjectType::Generator,
-        },
-        Object {
-            element: "elerium".into(),
-            type_: ObjectType::Microchip,
-        },
-        Object {
-            element: "dilithium".into(),
-            type_: ObjectType::Generator,
-        },
-        Object {
-            element: "dilithium".into(),
-            type_: ObjectType::Microchip,
-        },
-    ]
 }
