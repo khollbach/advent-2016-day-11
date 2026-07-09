@@ -1,4 +1,5 @@
 /target
+/profile.json.gz
 
 # Don't commit the input files to public git repos.
 # See: https://adventofcode.com/about#faq_copying

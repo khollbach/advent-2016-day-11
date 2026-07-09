@@ -51,9 +51,6 @@ fn bfs(start: State, target: State) -> Option<usize> {
         }
     }
 
-    dbg!(seen.len());
-    // part 1: [src/main.rs:54:5] seen.len() = 158236
-
     None
 }
 
