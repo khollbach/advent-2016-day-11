@@ -5,6 +5,10 @@ use anyhow::{Context, Result};
 fn main() -> Result<()> {
     let ans = bfs(State::start(), State::target()).context("no path found")?;
     println!("{}", ans);
+
+    let ans = bfs(State::start_part2(), State::target_part2()).context("no path found")?;
+    println!("{}", ans);
+
     Ok(())
 }
 
@@ -46,6 +50,9 @@ fn bfs(start: State, target: State) -> Option<usize> {
             }
         }
     }
+
+    dbg!(seen.len());
+    // part 1: [src/main.rs:54:5] seen.len() = 158236
 
     None
 }
@@ -219,4 +226,41 @@ impl State {
             .map(|vec| vec.into_iter().collect()),
         }
     }
+
+    fn start_part2() -> Self {
+        let mut state = Self::start();
+        for obj in part2_objects() {
+            state.floors[0].insert(obj);
+        }
+        state
+    }
+
+    fn target_part2() -> Self {
+        let mut state = Self::target();
+        for obj in part2_objects() {
+            state.floors[0].insert(obj);
+        }
+        state
+    }
+}
+
+fn part2_objects() -> Vec<Object> {
+    vec![
+        Object {
+            element: "elerium".into(),
+            type_: ObjectType::Generator,
+        },
+        Object {
+            element: "elerium".into(),
+            type_: ObjectType::Microchip,
+        },
+        Object {
+            element: "dilithium".into(),
+            type_: ObjectType::Generator,
+        },
+        Object {
+            element: "dilithium".into(),
+            type_: ObjectType::Microchip,
+        },
+    ]
 }
