@@ -1,6 +1,6 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeSet, BinaryHeap, HashSet},
+    collections::{BTreeSet, BinaryHeap, HashMap},
 };
 
 use anyhow::{Context, Result};
@@ -36,16 +36,16 @@ enum ObjectType {
 
 /// Find the shortest path from start to target.
 fn djikstra(start: State, target: State) -> Option<usize> {
+    let mut seen = HashMap::new();
     let mut to_visit = BinaryHeap::new(); // min-heap
-    let mut visited = HashSet::new();
 
+    seen.insert(start.clone(), 0);
     to_visit.push((Reverse(0), start));
 
     while let Some((Reverse(dist), curr)) = to_visit.pop() {
-        if visited.contains(&curr) {
+        if seen[&curr] < dist {
             continue;
         }
-        visited.insert(curr.clone());
 
         if curr == target {
             return Some(dist);
@@ -53,7 +53,10 @@ fn djikstra(start: State, target: State) -> Option<usize> {
 
         for next in curr.neighbors() {
             let new_dist = dist + 1;
-            to_visit.push((Reverse(new_dist), next));
+            if !seen.contains_key(&next) || new_dist < seen[&next] {
+                seen.insert(next.clone(), new_dist);
+                to_visit.push((Reverse(new_dist), next));
+            }
         }
     }
 
