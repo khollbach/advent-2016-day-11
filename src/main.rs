@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 use anyhow::{Context, Result};
 
@@ -12,22 +12,19 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+const NUM_FLOORS: isize = 4;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct State {
-    elevator: usize,
-    floors: [BTreeSet<Object>; 4],
+    elevator: isize,
+    /// Sorted.
+    elements: Vec<Element>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-struct Object {
-    element: String,
-    type_: ObjectType,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-enum ObjectType {
-    Microchip,
-    Generator,
+struct Element {
+    microchip: isize,
+    generator: isize,
 }
 
 /// Find the shortest path from start to target.
@@ -70,24 +67,45 @@ impl State {
 
         for dirn in [-1, 1] {
             let old_floor = self.elevator;
-            let new_floor = isize::try_from(old_floor).unwrap() + dirn;
+            let new_floor = old_floor + dirn;
 
-            let in_bounds =
-                0 <= new_floor && new_floor < isize::try_from(self.floors.len()).unwrap();
+            let in_bounds = 0 <= new_floor && new_floor < NUM_FLOORS;
             if !in_bounds {
                 continue;
             }
-            let new_floor = usize::try_from(new_floor).unwrap();
+
+            #[derive(PartialEq, Eq)]
+            enum ObjectType {
+                Microchip,
+                Generator,
+            }
+
+            let mut objects = vec![];
+            for e in 0..self.elements.len() {
+                if self.elements[e].microchip == old_floor {
+                    objects.push((e, ObjectType::Microchip));
+                }
+                if self.elements[e].generator == old_floor {
+                    objects.push((e, ObjectType::Generator));
+                }
+            }
 
             // Note that x and y can be the same.
-            for x in &self.floors[old_floor] {
-                for y in &self.floors[old_floor] {
+            for x in &objects {
+                for y in &objects {
                     let mut new_state = self.clone();
                     new_state.elevator = new_floor;
-                    new_state.floors[old_floor].remove(x);
-                    new_state.floors[old_floor].remove(y);
-                    new_state.floors[new_floor].insert(x.clone());
-                    new_state.floors[new_floor].insert(y.clone());
+                    match x.1 {
+                        ObjectType::Microchip => new_state.elements[x.0].microchip += dirn,
+                        ObjectType::Generator => new_state.elements[x.0].generator += dirn,
+                    }
+                    if x != y {
+                        match y.1 {
+                            ObjectType::Microchip => new_state.elements[y.0].microchip += dirn,
+                            ObjectType::Generator => new_state.elements[y.0].generator += dirn,
+                        }
+                    }
+                    new_state.elements.sort();
                     out.push(new_state);
                 }
             }
@@ -97,17 +115,12 @@ impl State {
     }
 
     fn is_valid(&self) -> bool {
-        assert!(self.elevator < self.floors.len());
-        self.floors.iter().all(|floor| {
-            floor.iter().all(|x| {
-                let generator = x.type_ == ObjectType::Generator;
-                let protected = floor
-                    .iter()
-                    .any(|y| x.element == y.element && y.type_ == ObjectType::Generator);
-                let fried = floor.iter().any(|y| y.type_ == ObjectType::Generator);
-                let safe = generator || protected || !fried;
-                safe
-            })
+        assert!(self.elevator < NUM_FLOORS);
+        self.elements.iter().all(|e| {
+            let protected = e.microchip == e.generator;
+            let fried = self.elements.iter().any(|e2| e2.generator == e.microchip);
+            let safe = protected || !fried;
+            safe
         })
     }
 }
@@ -117,147 +130,82 @@ impl State {
     fn start() -> Self {
         Self {
             elevator: 0,
-            floors: [
-                vec![
-                    Object {
-                        element: "promethium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "promethium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                ],
-                vec![
-                    Object {
-                        element: "cobalt".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "curium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "ruthenium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "plutonium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                ],
-                vec![
-                    Object {
-                        element: "cobalt".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "curium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "ruthenium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "plutonium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                ],
-                vec![],
+            // Note: this is sorted!
+            elements: [
+                // (microchip, generator)
+                (0, 0), // promethium
+                (2, 1), // cobalt
+                (2, 1), // curium
+                (2, 1), // ruthenium
+                (2, 1), // plutonium
             ]
-            .map(|vec| vec.into_iter().collect()),
+            .into_iter()
+            .map(|(microchip, generator)| Element {
+                microchip,
+                generator,
+            })
+            .collect(),
         }
     }
 
     fn target() -> Self {
         Self {
             elevator: 3,
-            floors: [
-                vec![],
-                vec![],
-                vec![],
-                vec![
-                    Object {
-                        element: "promethium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "promethium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "cobalt".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "curium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "ruthenium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "plutonium".into(),
-                        type_: ObjectType::Generator,
-                    },
-                    Object {
-                        element: "cobalt".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "curium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "ruthenium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                    Object {
-                        element: "plutonium".into(),
-                        type_: ObjectType::Microchip,
-                    },
-                ],
+            elements: [
+                (3, 3), // promethium
+                (3, 3), // cobalt
+                (3, 3), // curium
+                (3, 3), // ruthenium
+                (3, 3), // plutonium
             ]
-            .map(|vec| vec.into_iter().collect()),
+            .into_iter()
+            .map(|(microchip, generator)| Element {
+                microchip,
+                generator,
+            })
+            .collect(),
         }
     }
 
     fn start_part2() -> Self {
-        let mut state = Self::start();
-        for obj in part2_objects() {
-            state.floors[0].insert(obj);
+        Self {
+            elevator: 0,
+            elements: [
+                (0, 0), // promethium
+                (0, 0), // elerium
+                (0, 0), // dilithium
+                (2, 1), // cobalt
+                (2, 1), // curium
+                (2, 1), // ruthenium
+                (2, 1), // plutonium
+            ]
+            .into_iter()
+            .map(|(microchip, generator)| Element {
+                microchip,
+                generator,
+            })
+            .collect(),
         }
-        state
     }
 
     fn target_part2() -> Self {
-        let mut state = Self::target();
-        for obj in part2_objects() {
-            state.floors[0].insert(obj);
+        Self {
+            elevator: 3,
+            elements: [
+                (3, 3), // promethium
+                (3, 3), // elerium
+                (3, 3), // dilithium
+                (3, 3), // cobalt
+                (3, 3), // curium
+                (3, 3), // ruthenium
+                (3, 3), // plutonium
+            ]
+            .into_iter()
+            .map(|(microchip, generator)| Element {
+                microchip,
+                generator,
+            })
+            .collect(),
         }
-        state
     }
-}
-
-fn part2_objects() -> Vec<Object> {
-    vec![
-        Object {
-            element: "elerium".into(),
-            type_: ObjectType::Generator,
-        },
-        Object {
-            element: "elerium".into(),
-            type_: ObjectType::Microchip,
-        },
-        Object {
-            element: "dilithium".into(),
-            type_: ObjectType::Generator,
-        },
-        Object {
-            element: "dilithium".into(),
-            type_: ObjectType::Microchip,
-        },
-    ]
 }
