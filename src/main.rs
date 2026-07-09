@@ -9,7 +9,7 @@ fn main() -> Result<()> {
     let ans = a_star(State::start(), State::target()).context("no path found")?;
     println!("{}", ans);
 
-    // let ans = djikstra(State::start_part2(), State::target_part2()).context("no path found")?;
+    // let ans = a_star(State::start_part2(), State::target_part2()).context("no path found")?;
     // println!("{}", ans);
 
     Ok(())
@@ -68,7 +68,7 @@ impl State {
     fn target_estimate(&self) -> usize {
         let mut total_cost = 0;
         let mut num_objects = 0;
-        for (i, f) in self.floors.iter().enumerate() {
+        for f in &self.floors {
             num_objects += f.len();
             total_cost += if num_objects >= 2 {
                 num_objects * 2 - 3
@@ -259,7 +259,7 @@ impl State {
     fn target_part2() -> Self {
         let mut state = Self::target();
         for obj in part2_objects() {
-            state.floors[0].insert(obj);
+            state.floors[3].insert(obj);
         }
         state
     }
