@@ -67,8 +67,14 @@ impl State {
     /// This must be a lower bound on the distance to the target.
     fn target_estimate(&self) -> usize {
         let mut total_cost = 0;
+        let mut num_objects = 0;
         for (i, f) in self.floors.iter().enumerate() {
-            total_cost += (3 - i) * f.len();
+            num_objects += f.len();
+            total_cost += if num_objects >= 2 {
+                num_objects * 2 - 3
+            } else {
+                1
+            };
         }
         total_cost / 2
     }
