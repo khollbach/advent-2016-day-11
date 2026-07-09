@@ -1,12 +1,12 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeSet, BinaryHeap, HashMap},
+    collections::{BTreeSet, BinaryHeap, HashSet},
 };
 
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
-    let ans = djikstra(State::start(), State::target()).context("no path found")?;
+    let ans = a_star(State::start(), State::target()).context("no path found")?;
     println!("{}", ans);
 
     // let ans = djikstra(State::start_part2(), State::target_part2()).context("no path found")?;
@@ -34,29 +34,29 @@ enum ObjectType {
     Generator,
 }
 
-/// Find the shortest path from start to target.
-fn djikstra(start: State, target: State) -> Option<usize> {
-    let mut seen = HashMap::new();
+/// Find the shortest path from source to target.
+fn a_star(source: State, target: State) -> Option<usize> {
     let mut to_visit = BinaryHeap::new(); // min-heap
+    let mut visited = HashSet::new();
 
-    seen.insert(start.clone(), 0);
-    to_visit.push((Reverse(0), start));
+    let t = source.target_estimate();
+    to_visit.push((Reverse(0 + t), 0, t, source));
 
-    while let Some((Reverse(dist), curr)) = to_visit.pop() {
-        if seen[&curr] < dist {
+    while let Some((_, source_est, _, curr)) = to_visit.pop() {
+        if visited.contains(&curr) {
             continue;
         }
+        visited.insert(curr.clone());
 
         if curr == target {
-            return Some(dist);
+            dbg!(visited.len());
+            return Some(source_est);
         }
 
         for next in curr.neighbors() {
-            let new_dist = dist + 1;
-            if !seen.contains_key(&next) || new_dist < seen[&next] {
-                seen.insert(next.clone(), new_dist);
-                to_visit.push((Reverse(new_dist), next));
-            }
+            let s = source_est + 1;
+            let t = next.target_estimate();
+            to_visit.push((Reverse(s + t), s, t, next));
         }
     }
 
@@ -64,6 +64,15 @@ fn djikstra(start: State, target: State) -> Option<usize> {
 }
 
 impl State {
+    /// This must be a lower bound on the distance to the target.
+    fn target_estimate(&self) -> usize {
+        let mut total_cost = 0;
+        for (i, f) in self.floors.iter().enumerate() {
+            total_cost += (3 - i) * f.len();
+        }
+        total_cost / 2
+    }
+
     fn neighbors(&self) -> Vec<Self> {
         self.neighbors_including_invalid()
             .into_iter()
