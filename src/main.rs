@@ -1,16 +1,16 @@
 use std::{
     cmp::Reverse,
-    collections::{BTreeSet, BinaryHeap, HashSet},
+    collections::{BTreeSet, BinaryHeap, HashMap},
 };
 
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
-    let ans = a_star(State::start(), State::target()).context("no path found")?;
-    println!("{}", ans);
-
-    // let ans = a_star(State::start_part2(), State::target_part2()).context("no path found")?;
+    // let ans = a_star(State::start(), State::target()).context("no path found")?;
     // println!("{}", ans);
+
+    let ans = a_star(State::start_part2(), State::target_part2()).context("no path found")?;
+    println!("{}", ans);
 
     Ok(())
 }
@@ -36,27 +36,31 @@ enum ObjectType {
 
 /// Find the shortest path from source to target.
 fn a_star(source: State, target: State) -> Option<usize> {
+    let mut seen = HashMap::new();
     let mut to_visit = BinaryHeap::new(); // min-heap
-    let mut visited = HashSet::new();
 
     let t = source.target_estimate();
+    seen.insert(source.clone(), t);
     to_visit.push((Reverse(0 + t), 0, t, source));
 
-    while let Some((_, source_est, _, curr)) = to_visit.pop() {
-        if visited.contains(&curr) {
+    while let Some((Reverse(cost), source_est, _, curr)) = to_visit.pop() {
+        if seen[&curr] < cost {
             continue;
         }
-        visited.insert(curr.clone());
 
         if curr == target {
-            dbg!(visited.len());
+            dbg!(seen.len());
             return Some(source_est);
         }
 
         for next in curr.neighbors() {
             let s = source_est + 1;
             let t = next.target_estimate();
-            to_visit.push((Reverse(s + t), s, t, next));
+            let c = s + t;
+            if !seen.contains_key(&next) || c < seen[&next] {
+                seen.insert(next.clone(), c);
+                to_visit.push((Reverse(c), s, t, next));
+            }
         }
     }
 
