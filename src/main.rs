@@ -1,18 +1,22 @@
-use std::collections::{BTreeSet, HashSet, VecDeque};
+use std::{
+    cmp::Reverse,
+    collections::{BTreeSet, BinaryHeap, HashSet},
+};
 
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
-    let ans = bfs(State::start(), State::target()).context("no path found")?;
+    let ans = djikstra(State::start(), State::target()).context("no path found")?;
     println!("{}", ans);
 
-    let ans = bfs(State::start_part2(), State::target_part2()).context("no path found")?;
-    println!("{}", ans);
+    // let ans = djikstra(State::start_part2(), State::target_part2()).context("no path found")?;
+    // println!("{}", ans);
 
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// (Shouldn't really be Ord, but we're using it in a BinaryHeap.)
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct State {
     elevator: usize,
     floors: [BTreeSet<Object>; 4],
@@ -31,23 +35,25 @@ enum ObjectType {
 }
 
 /// Find the shortest path from start to target.
-fn bfs(start: State, target: State) -> Option<usize> {
-    let mut seen = HashSet::new();
-    let mut to_visit = VecDeque::new();
+fn djikstra(start: State, target: State) -> Option<usize> {
+    let mut to_visit = BinaryHeap::new(); // min-heap
+    let mut visited = HashSet::new();
 
-    seen.insert(start.clone());
-    to_visit.push_back((start, 0));
+    to_visit.push((Reverse(0), start));
 
-    while let Some((curr, dist)) = to_visit.pop_front() {
+    while let Some((Reverse(dist), curr)) = to_visit.pop() {
+        if visited.contains(&curr) {
+            continue;
+        }
+        visited.insert(curr.clone());
+
         if curr == target {
             return Some(dist);
         }
 
         for next in curr.neighbors() {
-            if !seen.contains(&next) {
-                seen.insert(next.clone());
-                to_visit.push_back((next, dist + 1));
-            }
+            let new_dist = dist + 1;
+            to_visit.push((Reverse(new_dist), next));
         }
     }
 
