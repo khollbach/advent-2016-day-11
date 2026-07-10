@@ -1,6 +1,5 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
-use ahash::AHashSet;
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
@@ -22,9 +21,11 @@ struct State {
     generators: [u8; NUM_FLOORS],
 }
 
+// TODO: is there a way to make this parallel?
+
 /// Find the shortest path from source to target.
 fn bfs(source: State, target: State) -> Option<u8> {
-    let mut seen = AHashSet::new();
+    let mut seen = HashSet::new();
     let mut to_visit = VecDeque::new();
 
     seen.insert(source);
@@ -65,7 +66,7 @@ impl State {
         // can go up or down
         // can take any 1, or any 2 items with you
 
-        let mut out = Vec::with_capacity(512);
+        let mut out = vec![];
 
         for dirn in [-1, 1] {
             let old_floor = usize::from(self.elevator);
