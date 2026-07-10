@@ -1,6 +1,5 @@
 use std::{
-    cmp::Reverse,
-    collections::{BinaryHeap, HashMap},
+    array, cmp::Reverse, collections::{BinaryHeap, HashMap},
 };
 
 use anyhow::{Context, Result};
@@ -17,7 +16,7 @@ fn main() -> Result<()> {
 
 const NUM_FLOORS: usize = 4;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct State {
     elevator: u8,
     microchips: [u8; NUM_FLOORS],
@@ -47,7 +46,11 @@ fn a_star(source: State, target: State) -> Option<u8> {
             let s = source_est + 1;
             let t = next.target_estimate();
             let c = s + t;
-            if !seen.contains_key(&next) || c < seen[&next] {
+            // if !seen.contains_key(&next) || c < seen[&next] {
+            if let Some(&seen_c) = seen.get(&next)
+                && c >= seen_c
+            {
+            } else {
                 seen.insert(next.clone(), c);
                 to_visit.push((Reverse(c), s, next));
             }
@@ -58,14 +61,41 @@ fn a_star(source: State, target: State) -> Option<u8> {
 }
 
 impl State {
+    fn num_objects(&self, floor: usize) -> u8 {
+        let count = self.microchips[floor].count_ones() + self.generators[floor].count_ones();
+        count as u8
+    }
+
     /// This must be a lower bound on the distance to the target.
     fn target_estimate(&self) -> u8 {
+        let mut i = 0;
+        while i < NUM_FLOORS {
+            if self.num_objects(i) != 0 {
+                break;
+            }
+            i += 1;
+        }
+        let bottom_floor = i;
+
+        let mut i = self.elevator as usize;
+        let mut num_objects: [_; NUM_FLOORS] = array::from_fn(|i| self.num_objects(i));
+
         let mut total_cost = 0;
-        let mut num_objects = 0;
-        for i in 0..NUM_FLOORS {
-            num_objects += self.microchips[i].count_ones() + self.generators[i].count_ones();
-            total_cost += if num_objects >= 2 {
-                num_objects as u8 * 2 - 3
+        while i > bottom_floor {
+            assert_ne!(num_objects[i], 0);
+
+            num_objects[i] -= 1;
+            num_objects[i - 1] += 1;
+            total_cost += 1;
+
+            i -= 1;
+        }
+
+        let mut carried_objects = 0;
+        for i in bottom_floor..NUM_FLOORS {
+            carried_objects += num_objects[i];
+            total_cost += if carried_objects >= 2 {
+                carried_objects as u8 * 2 - 3
             } else {
                 1
             };
