@@ -3,10 +3,10 @@ use std::collections::{HashSet, VecDeque};
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
-    let ans = a_star(State::start(), State::target()).context("no path found")?;
+    let ans = bfs(State::start(), State::target()).context("no path found")?;
     println!("{}", ans);
 
-    let ans = a_star(State::start_part2(), State::target_part2()).context("no path found")?;
+    let ans = bfs(State::start_part2(), State::target_part2()).context("no path found")?;
     println!("{}", ans);
 
     Ok(())
@@ -22,7 +22,7 @@ struct State {
 }
 
 /// Find the shortest path from source to target.
-fn a_star(source: State, target: State) -> Option<u8> {
+fn bfs(source: State, target: State) -> Option<u8> {
     let mut seen = HashSet::new();
     let mut to_visit = VecDeque::new();
 
@@ -47,37 +47,18 @@ fn a_star(source: State, target: State) -> Option<u8> {
 }
 
 impl State {
-    /// This must be a lower bound on the distance to the target.
-    fn _target_estimate(&self) -> u8 {
-        // Good heuristic: explores 3,822,734 states.
-        // let mut total_cost = 0;
-        // let mut num_objects = 0;
-        // for i in 0..NUM_FLOORS {
-        //     num_objects += self.microchips[i].count_ones() + self.generators[i].count_ones();
-        //     total_cost += if num_objects >= 2 {
-        //         num_objects as u8 * 2 - 3
-        //     } else {
-        //         1
-        //     };
-        // }
-        // total_cost
-
-        // Reasonable-seeming heuristic: explores 6,042,507 states.
-        // let mut total_cost = 0;
-        // for i in 0..NUM_FLOORS {
-        //     total_cost += (self.microchips[i].count_ones() + self.generators[i].count_ones()) as u8;
-        // }
-        // total_cost / 2
-
-        // No heuristic: explores 6,042,507 states.
-        // Oh. So you're saying the heuristic never really mattered that much at all.....
-        0
-    }
-
     fn neighbors(&self) -> impl Iterator<Item = Self> {
         self.neighbors_including_invalid()
             .into_iter()
             .filter(Self::is_valid)
+    }
+
+    fn is_valid(&self) -> bool {
+        debug_assert!(self.elevator < u8::try_from(NUM_FLOORS).unwrap());
+        (0..NUM_FLOORS).all(|i| {
+            let exposed_microchips = self.microchips[i] & !self.generators[i];
+            exposed_microchips == 0 || self.generators[i] == 0
+        })
     }
 
     fn neighbors_including_invalid(&self) -> Vec<Self> {
@@ -139,14 +120,6 @@ impl State {
             1 => &mut self.generators,
             _ => panic!(),
         }
-    }
-
-    fn is_valid(&self) -> bool {
-        debug_assert!(self.elevator < u8::try_from(NUM_FLOORS).unwrap());
-        (0..NUM_FLOORS).all(|i| {
-            let exposed_microchips = self.microchips[i] & !self.generators[i];
-            exposed_microchips == 0 || self.generators[i] == 0
-        })
     }
 }
 
