@@ -70,7 +70,7 @@ impl State {
                 1
             };
         }
-        total_cost / 2
+        total_cost
     }
 
     fn neighbors(&self) -> Vec<Self> {
