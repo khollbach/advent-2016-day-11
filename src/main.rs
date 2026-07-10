@@ -37,8 +37,7 @@ fn bfs(source: State, target: State) -> Option<u8> {
         }
 
         for next in curr.neighbors() {
-            if !seen.contains(&next) {
-                seen.insert(next);
+            if seen.insert(next) {
                 to_visit.push_back((next, dist + 1));
             }
         }
