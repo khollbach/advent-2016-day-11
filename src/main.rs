@@ -1,5 +1,6 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 
+use ahash::AHashSet;
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
@@ -14,7 +15,7 @@ fn main() -> Result<()> {
 
 const NUM_FLOORS: usize = 4;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct State {
     elevator: u8,
     microchips: [u8; NUM_FLOORS],
@@ -23,7 +24,7 @@ struct State {
 
 /// Find the shortest path from source to target.
 fn bfs(source: State, target: State) -> Option<u8> {
-    let mut seen = HashSet::new();
+    let mut seen = AHashSet::new();
     let mut to_visit = VecDeque::new();
 
     seen.insert(source);
@@ -31,7 +32,6 @@ fn bfs(source: State, target: State) -> Option<u8> {
 
     while let Some((curr, dist)) = to_visit.pop_front() {
         if curr == target {
-            dbg!(seen.len());
             return Some(dist);
         }
 
