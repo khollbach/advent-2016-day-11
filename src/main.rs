@@ -73,56 +73,55 @@ impl State {
         total_cost
     }
 
-    fn neighbors(&self) -> Vec<Self> {
-        self.neighbors_including_invalid()
-            .into_iter()
-            .filter(Self::is_valid)
-            .collect()
+    fn neighbors(&self) -> impl Iterator<Item = Self> {
+        self.neighbors_including_invalid().filter(Self::is_valid)
     }
 
-    fn neighbors_including_invalid(&self) -> Vec<Self> {
+    fn neighbors_including_invalid(&self) -> impl Iterator<Item = Self> {
         // can go up or down
         // can take any 1, or any 2 items with you
 
-        let mut out = vec![];
+        let old_floor = usize::from(self.elevator);
+        [-1, 1]
+            .into_iter()
+            .filter_map(move |dirn| {
+                let new_floor = isize::try_from(old_floor).unwrap() + dirn;
 
-        for dirn in [-1, 1] {
-            let old_floor = usize::from(self.elevator);
-            let new_floor = isize::try_from(old_floor).unwrap() + dirn;
-
-            let in_bounds = 0 <= new_floor && new_floor < isize::try_from(NUM_FLOORS).unwrap();
-            if !in_bounds {
-                continue;
-            }
-            let new_floor = usize::try_from(new_floor).unwrap();
-
-            // Note that x and y can be the same.
-            // x = (i, a)
-            for i in 0..2 {
-                for a in 0..8 {
-                    // y = (j, b)
-                    for j in 0..2 {
-                        for b in a..8 {
-                            let x_le_y = (i, a) <= (j, b);
-                            let x_exists = self.obj(i)[old_floor] & 1 << a != 0;
-                            let y_exists = self.obj(j)[old_floor] & 1 << b != 0;
-
-                            if x_le_y && x_exists && y_exists {
-                                let mut new_state = self.clone();
-                                new_state.elevator = u8::try_from(new_floor).unwrap();
-                                new_state.obj_mut(i)[old_floor] &= !(1 << a);
-                                new_state.obj_mut(j)[old_floor] &= !(1 << b);
-                                new_state.obj_mut(i)[new_floor] |= 1 << a;
-                                new_state.obj_mut(j)[new_floor] |= 1 << b;
-                                out.push(new_state);
-                            }
-                        }
-                    }
+                let in_bounds = 0 <= new_floor && new_floor < isize::try_from(NUM_FLOORS).unwrap();
+                if in_bounds {
+                    Some(usize::try_from(new_floor).unwrap())
+                } else {
+                    None
                 }
-            }
-        }
+            })
+            .flat_map(move |new_floor| {
+                // Note that x and y can be the same.
+                // x = (i, a)
+                (0..2).flat_map(move |i| {
+                    (0..8).flat_map(move |a| {
+                        // y = (j, b)
+                        (0..2).flat_map(move |j| {
+                            (a..8).filter_map(move |b| {
+                                let x_le_y = (i, a) <= (j, b);
+                                let x_exists = self.obj(i)[old_floor] & 1 << a != 0;
+                                let y_exists = self.obj(j)[old_floor] & 1 << b != 0;
 
-        out
+                                if x_le_y && x_exists && y_exists {
+                                    let mut new_state = self.clone();
+                                    new_state.elevator = u8::try_from(new_floor).unwrap();
+                                    new_state.obj_mut(i)[old_floor] &= !(1 << a);
+                                    new_state.obj_mut(j)[old_floor] &= !(1 << b);
+                                    new_state.obj_mut(i)[new_floor] |= 1 << a;
+                                    new_state.obj_mut(j)[new_floor] |= 1 << b;
+                                    Some(new_state)
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                    })
+                })
+            })
     }
 
     fn obj(&self, i: usize) -> &[u8; 4] {
