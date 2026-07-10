@@ -25,7 +25,7 @@ struct State {
 }
 
 /// Find the shortest path from source to target.
-fn a_star(source: State, target: State) -> Option<u32> {
+fn a_star(source: State, target: State) -> Option<u8> {
     let mut seen = HashMap::new();
     let mut to_visit = BinaryHeap::new(); // min-heap
 
@@ -59,13 +59,13 @@ fn a_star(source: State, target: State) -> Option<u32> {
 
 impl State {
     /// This must be a lower bound on the distance to the target.
-    fn target_estimate(&self) -> u32 {
+    fn target_estimate(&self) -> u8 {
         let mut total_cost = 0;
         let mut num_objects = 0;
         for i in 0..NUM_FLOORS {
             num_objects += self.microchips[i].count_ones() + self.generators[i].count_ones();
             total_cost += if num_objects >= 2 {
-                num_objects * 2 - 3
+                num_objects as u8 * 2 - 3
             } else {
                 1
             };
