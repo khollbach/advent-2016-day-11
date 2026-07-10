@@ -1,7 +1,4 @@
-use std::{
-    cmp::Reverse,
-    collections::{BinaryHeap, HashMap},
-};
+use std::collections::{HashSet, VecDeque};
 
 use anyhow::{Context, Result};
 
@@ -17,7 +14,7 @@ fn main() -> Result<()> {
 
 const NUM_FLOORS: usize = 4;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct State {
     elevator: u8,
     microchips: [u8; NUM_FLOORS],
@@ -26,30 +23,22 @@ struct State {
 
 /// Find the shortest path from source to target.
 fn a_star(source: State, target: State) -> Option<u8> {
-    let mut seen = HashMap::new();
-    let mut to_visit = BinaryHeap::new(); // min-heap
+    let mut seen = HashSet::new();
+    let mut to_visit = VecDeque::new();
 
-    let t = source.target_estimate();
-    seen.insert(source.clone(), t);
-    to_visit.push((Reverse(0 + t), 0, source));
+    seen.insert(source);
+    to_visit.push_back((source, 0));
 
-    while let Some((Reverse(cost), source_est, curr)) = to_visit.pop() {
-        if seen[&curr] < cost {
-            continue;
-        }
-
+    while let Some((curr, dist)) = to_visit.pop_front() {
         if curr == target {
             dbg!(seen.len());
-            return Some(source_est);
+            return Some(dist);
         }
 
         for next in curr.neighbors() {
-            let s = source_est + 1;
-            let t = next.target_estimate();
-            let c = s + t;
-            if !seen.contains_key(&next) || c < seen[&next] {
-                seen.insert(next.clone(), c);
-                to_visit.push((Reverse(c), s, next));
+            if !seen.contains(&next) {
+                seen.insert(next);
+                to_visit.push_back((next, dist + 1));
             }
         }
     }
@@ -59,18 +48,30 @@ fn a_star(source: State, target: State) -> Option<u8> {
 
 impl State {
     /// This must be a lower bound on the distance to the target.
-    fn target_estimate(&self) -> u8 {
-        let mut total_cost = 0;
-        let mut num_objects = 0;
-        for i in 0..NUM_FLOORS {
-            num_objects += self.microchips[i].count_ones() + self.generators[i].count_ones();
-            total_cost += if num_objects >= 2 {
-                num_objects as u8 * 2 - 3
-            } else {
-                1
-            };
-        }
-        total_cost
+    fn _target_estimate(&self) -> u8 {
+        // Good heuristic: explores 3,822,734 states.
+        // let mut total_cost = 0;
+        // let mut num_objects = 0;
+        // for i in 0..NUM_FLOORS {
+        //     num_objects += self.microchips[i].count_ones() + self.generators[i].count_ones();
+        //     total_cost += if num_objects >= 2 {
+        //         num_objects as u8 * 2 - 3
+        //     } else {
+        //         1
+        //     };
+        // }
+        // total_cost
+
+        // Reasonable-seeming heuristic: explores 6,042,507 states.
+        // let mut total_cost = 0;
+        // for i in 0..NUM_FLOORS {
+        //     total_cost += (self.microchips[i].count_ones() + self.generators[i].count_ones()) as u8;
+        // }
+        // total_cost / 2
+
+        // No heuristic: explores 6,042,507 states.
+        // Oh. So you're saying the heuristic never really mattered that much at all.....
+        0
     }
 
     fn neighbors(&self) -> impl Iterator<Item = Self> {
